@@ -1,0 +1,114 @@
+CREATE SCHEMA biblioteca;
+USE biblioteca;
+
+CREATE TABLE Libros(
+id_libro int NOT NULL AUTO_INCREMENT,
+nombre VARCHAR(100) NOT NULL,
+cantidad int NOT NULL,
+id_autor int NOT NULL,
+id_genero int NOT NULL,
+edicion date,
+id_editorial int NOT NULL,
+id_reserva int NOT NULL,
+pasillo int NOT NULL,
+PRIMARY KEY (id_libro)
+);
+SELECT * FROM libros;
+
+CREATE TABLE Autores(
+id_autor int NOT NULL AUTO_INCREMENT,
+nombre VARCHAR (50) NOT NULL,
+nacimiento date,
+id_pais int NOT NULL,
+PRIMARY KEY (id_autor)
+);
+SELECT * FROM autores;
+
+CREATE TABLE Genero(
+id_genero int NOT NULL AUTO_INCREMENT,
+nombre VARCHAR(20) NOT NULL,
+PRIMARY KEY (id_genero)
+);
+SELECT * FROM genero;
+
+CREATE TABLE Ubicacion(
+pasillo int NOT NULL,
+id_genero int NOT NULL,
+PRIMARY KEY (pasillo)
+);
+SELECT * FROM ubicacion;
+
+CREATE TABLE Editoriales(
+id_editorial int NOT NULL AUTO_INCREMENT,
+nombre VARCHAR(50),
+id_pais int NOT NULL,
+PRIMARY KEY (id_editorial)
+);
+SELECT * FROM editoriales;
+
+CREATE TABLE Usuarios(
+id_usuario int NOT null AUTO_INCREMENT,
+nombre VARCHAR(50) NOT NULL,
+email VARCHAR(50) NOT NULL,
+telefono int NOT NULL,
+nacimiento date,
+id_pais int NOT NULL,
+id_reserva int,
+PRIMARY KEY (id_usuario)
+);
+SELECT * FROM usuarios;
+
+CREATE TABLE Empleados(
+id_empleado int NOT NULL AUTO_INCREMENT,
+nombre VARCHAR(50) NOT NULL,
+nacimiento date,
+id_pais int NOT NULL,
+id_reserva int,
+PRIMARY KEY (id_empleado)
+);
+SELECT * FROM empleados;
+
+CREATE TABLE Reservas(
+id_reserva int NOT NULL AUTO_INCREMENT,
+fecha_sacado date,
+fecha_termino date,
+fecha_devolucion date,
+id_libro int NOT NULL,
+id_empleado int NOT NULL,
+id_usuario int NOT NULL,
+PRIMARY KEY (id_reserva)
+);
+SELECT * FROM reservas;
+
+CREATE TABLE Paises(
+id_pais int NOT NULL AUTO_INCREMENT,
+pais VARCHAR(30),
+PRIMARY KEY (id_pais)
+);
+SELECT * FROM paises;
+
+#Agregar las FK a la tabla libros
+ALTER TABLE libros ADD FOREIGN KEY (id_autor) REFERENCES autores(id_autor);
+ALTER TABLE libros ADD FOREIGN KEY (id_genero) REFERENCES genero(id_genero);
+ALTER TABLE libros ADD FOREIGN KEY (id_editorial) REFERENCES editoriales(id_editorial);
+ALTER TABLE libros ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+ALTER TABLE libros ADD FOREIGN KEY (pasillo) REFERENCES ubicacion(pasillo);
+
+#agregar las FK a la tabla autores
+ALTER TABLE autores ADD FOREIGN KEY (id_pais) REFERENCES paises(id_pais);
+
+#agregar las fk a la tabla editoriales
+ALTER TABLE editoriales ADD FOREIGN KEY (id_pais) REFERENCES paises(id_pais);
+
+#agregar las FK a la tabla usuarios
+ALTER TABLE usuarios ADD FOREIGN KEY (id_pais) REFERENCES paises(id_pais);
+ALTER TABLE usuarios ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+
+#agregar las FK a la tabla empleados
+ALTER TABLE empleados ADD FOREIGN KEY (id_pais) REFERENCES paises(id_pais);
+ALTER TABLE empleados ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+
+#agregar las FK a la tabla reservas
+ALTER TABLE reservas ADD FOREIGN KEY (id_libro) REFERENCES libros(id_libro);
+ALTER TABLE reservas ADD FOREIGN KEY (id_empleado) REFERENCES empleados(id_empleado);
+ALTER TABLE reservas ADD FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario);
