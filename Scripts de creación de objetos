@@ -1,0 +1,212 @@
+CREATE SCHEMA biblioteca;
+USE biblioteca;
+
+CREATE TABLE Paises(
+    id_pais int NOT NULL AUTO_INCREMENT,
+    pais VARCHAR(30),
+    PRIMARY KEY (id_pais)
+);
+
+CREATE TABLE Genero(
+    id_genero int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(20) NOT NULL,
+    PRIMARY KEY (id_genero)
+);
+
+CREATE TABLE Ubicacion(
+    pasillo int NOT NULL,
+    id_genero int NOT NULL,
+    PRIMARY KEY (pasillo, id_genero),
+    FOREIGN KEY (id_genero) REFERENCES genero(id_genero)
+);
+
+CREATE TABLE Autores(
+    id_autor int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    nacimiento date,
+    id_pais int NOT NULL,
+    PRIMARY KEY (id_autor),
+    FOREIGN KEY (id_pais) REFERENCES paises(id_pais)
+    ON UPDATE CASCADE
+);
+
+CREATE TABLE Editoriales(
+    id_editorial int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(50),
+    id_pais int NOT NULL,
+    PRIMARY KEY (id_editorial),
+    FOREIGN KEY (id_pais) REFERENCES paises(id_pais)
+    ON UPDATE CASCADE
+);
+
+CREATE TABLE Libros(
+    id_libro int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    cantidad int NOT NULL,
+    id_autor int NOT NULL,
+    id_genero int NOT NULL,
+    edicion date,
+    id_editorial int NOT NULL,
+    pasillo int NOT NULL,
+    PRIMARY KEY (id_libro),
+    FOREIGN KEY (id_autor) REFERENCES autores(id_autor),
+    FOREIGN KEY (id_genero) REFERENCES genero(id_genero),
+    FOREIGN KEY (id_editorial) REFERENCES editoriales(id_editorial),
+    FOREIGN KEY (pasillo) REFERENCES ubicacion(pasillo)
+    ON UPDATE CASCADE
+);
+
+CREATE TABLE Usuarios(
+    id_usuario int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    email VARCHAR(50) NOT NULL,
+    telefono bigint NOT NULL,
+    nacimiento date,
+    id_pais int NOT NULL,
+    PRIMARY KEY (id_usuario),
+    FOREIGN KEY (id_pais) REFERENCES paises(id_pais)
+    ON UPDATE CASCADE
+);
+
+CREATE TABLE Empleados(
+    id_empleado int NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    nacimiento date,
+    id_pais int NOT NULL,
+    PRIMARY KEY (id_empleado),
+    FOREIGN KEY (id_pais) REFERENCES paises(id_pais)
+    ON UPDATE CASCADE
+);
+
+CREATE TABLE Reservas(
+    id_reserva int NOT NULL AUTO_INCREMENT,
+    fecha_sacado date,
+    fecha_termino date,
+    fecha_devolucion date,
+    id_libro int NOT NULL,
+    id_empleado int NOT NULL,
+    id_usuario int NOT NULL,
+    PRIMARY KEY (id_reserva),
+    FOREIGN KEY (id_libro) REFERENCES libros(id_libro),
+    FOREIGN KEY (id_empleado) REFERENCES empleados(id_empleado),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+    ON UPDATE CASCADE
+);
+
+ALTER TABLE libros ADD COLUMN id_reserva int;
+ALTER TABLE libros ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+
+ALTER TABLE usuarios ADD COLUMN id_reserva int;
+ALTER TABLE usuarios ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+
+ALTER TABLE empleados ADD COLUMN id_reserva int;
+ALTER TABLE empleados ADD FOREIGN KEY (id_reserva) REFERENCES reservas(id_reserva);
+
+#vistas
+CREATE VIEW LibrosDisponibles AS
+SELECT l.id_libro, l.nombre, l.cantidad - COALESCE(r.cantidad_reservada, 0) AS cantidad_disponible
+FROM Libros l
+LEFT JOIN (
+    SELECT id_libro, COUNT(*) AS cantidad_reservada
+    FROM Reservas
+    WHERE fecha_devolucion IS NULL
+    GROUP BY id_libro
+) r ON l.id_libro = r.id_libro;
+select * from librosdisponibles;
+
+CREATE VIEW ReservasActivas AS
+SELECT r.id_reserva, l.nombre AS libro, u.nombre AS usuario, e.nombre AS empleado, r.fecha_sacado, r.fecha_termino
+FROM Reservas r
+JOIN Libros l ON r.id_libro = l.id_libro
+JOIN Usuarios u ON r.id_usuario = u.id_usuario
+JOIN Empleados e ON r.id_empleado = e.id_empleado
+WHERE r.fecha_devolucion IS NULL;
+select * from ReservasActivas;
+
+CREATE VIEW UsuariosConReservas AS
+SELECT u.nombre AS usuario, COUNT(r.id_reserva) AS cantidad_reservas
+FROM Usuarios u
+JOIN Reservas r ON u.id_usuario = r.id_usuario
+WHERE r.fecha_devolucion IS NULL
+GROUP BY u.id_usuario;
+select * from UsuariosConReservas;
+
+CREATE VIEW LibrosPorCortazar AS
+SELECT a.nombre AS autor, l.nombre AS libro, l.cantidad
+FROM Libros l
+JOIN Autores a ON l.id_autor = a.id_autor
+WHERE a.nombre = 'Julio Cortázar';
+select * from LibrosPorCortazar;
+
+CREATE VIEW LibrosPorGenero AS
+SELECT g.nombre AS genero, l.nombre AS libro, l.cantidad
+FROM Libros l
+JOIN Genero g ON l.id_genero = g.id_genero;
+select * from LibrosPorGenero;
+
+#funciones
+DELIMITER $$
+CREATE FUNCTION libro_disponible(libro_id INT) 
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    DECLARE reservado INT;
+
+    SELECT COUNT(*) INTO reservado
+    FROM Reservas
+    WHERE id_libro = libro_id AND fecha_devolucion IS NULL;
+
+    -- Retornar TRUE si no hay reservas activas, FALSE en caso contrario
+    RETURN reservado = 0;
+END$$
+DELIMITER ;
+
+select libro_disponible (67);
+
+DELIMITER $$
+CREATE FUNCTION contar_libros_por_autor(nombre_autor VARCHAR(50)) 
+RETURNS INT
+READS SQL DATA
+BEGIN
+    DECLARE total_libros INT;
+    SELECT COUNT(*) INTO total_libros
+    FROM Libros l
+    JOIN Autores a ON l.id_autor = a.id_autor
+    WHERE a.nombre = nombre_autor;
+    RETURN total_libros;
+END$$
+DELIMITER ;
+
+SELECT contar_libros_por_autor ("Pablo Neruda");
+#stores procedures
+DELIMITER $$
+CREATE PROCEDURE libros_en_reserva()
+BEGIN
+    SELECT l.nombre AS libro_nombre, 
+           u.nombre AS usuario_nombre, 
+           r.fecha_sacado, 
+           r.fecha_termino
+    FROM Reservas r
+    JOIN Libros l ON r.id_libro = l.id_libro
+    JOIN Usuarios u ON r.id_usuario = u.id_usuario;
+END$$
+DELIMITER ;
+call libros_en_reserva();
+
+DELIMITER $$
+CREATE PROCEDURE agregar_libro(
+    IN nombre_libro VARCHAR(100),
+    IN cantidad INT,
+    IN id_autor INT,
+    IN id_genero INT,
+    IN edicion DATE,
+    IN id_editorial INT,
+    IN pasillo INT
+)
+BEGIN
+    INSERT INTO Libros (nombre, cantidad, id_autor, id_genero, edicion, id_editorial, pasillo)
+    VALUES (nombre_libro, cantidad, id_autor, id_genero, edicion, id_editorial, pasillo);
+END$$
+DELIMITER ;
+call agregar_libro (
+"El libro de arena", 5, 3, 5, "1975-01-01", 1, 5);
